@@ -17,7 +17,7 @@ jobs:
 
       - name: Install scanner
         run: |
-          curl -sSL https://github.com/yourusername/tree-sitter-ci-scanner/releases/latest/download/scanner-x86_64-unknown-linux-gnu -o /usr/local/bin/scanner
+          curl -sSL https://github.com/crstnmac/tree-sitter-ci-scanner/releases/latest/download/scanner-x86_64-unknown-linux-gnu -o /usr/local/bin/scanner
           chmod +x /usr/local/bin/scanner
 
       - name: Run scanner

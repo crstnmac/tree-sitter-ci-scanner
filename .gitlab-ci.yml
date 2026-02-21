@@ -7,9 +7,9 @@ code_scan:
 
   before_script:
     # Install scanner from releases
-    - cargo install scanner --git https://github.com/yourusername/tree-sitter-ci-scanner.git
+    - cargo install scanner --git https://github.com/crstnmac/tree-sitter-ci-scanner.git
     # OR build from source
-    # - git clone https://github.com/yourusername/tree-sitter-ci-scanner.git
+    # - git clone https://github.com/crstnmac/tree-sitter-ci-scanner.git
     # - cd tree-sitter-ci-scanner
     # - cargo build --release
     # - mv target/release/scanner /usr/local/bin/

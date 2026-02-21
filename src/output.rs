@@ -22,7 +22,7 @@ impl SarifFormatter {
                     driver: SarifToolComponent {
                         name: "scanner".to_string(),
                         version: env!("CARGO_PKG_VERSION").to_string(),
-                        information_uri: "https://github.com/yourusername/tree-sitter-ci-scanner"
+                        information_uri: "https://github.com/crstnmac/tree-sitter-ci-scanner"
                             .to_string(),
                         rules: Self::extract_rules(issues),
                     },

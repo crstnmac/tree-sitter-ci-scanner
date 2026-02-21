@@ -17,24 +17,24 @@ A fast, tree-sitter based static analysis tool for CI/CD pipelines.
 ### From releases (recommended)
 ```bash
 # Linux
-curl -sSL https://github.com/yourusername/tree-sitter-ci-scanner/releases/latest/download/scanner-x86_64-unknown-linux-gnu -o /usr/local/bin/scanner
+curl -sSL https://github.com/crstnmac/tree-sitter-ci-scanner/releases/latest/download/scanner-x86_64-unknown-linux-gnu -o /usr/local/bin/scanner
 chmod +x /usr/local/bin/scanner
 
 # macOS
-curl -sSL https://github.com/yourusername/tree-sitter-ci-scanner/releases/latest/download/scanner-x86_64-apple-darwin -o /usr/local/bin/scanner
+curl -sSL https://github.com/crstnmac/tree-sitter-ci-scanner/releases/latest/download/scanner-x86_64-apple-darwin -o /usr/local/bin/scanner
 chmod +x /usr/local/bin/scanner
 ```
 
 ### Build from source
 ```bash
-git clone https://github.com/yourusername/tree-sitter-ci-scanner.git
+git clone https://github.com/crstnmac/tree-sitter-ci-scanner.git
 cd tree-sitter-ci-scanner
 cargo install --path .
 ```
 
 ### Cargo install
 ```bash
-cargo install scanner --git https://github.com/yourusername/tree-sitter-ci-scanner.git
+cargo install scanner --git https://github.com/crstnmac/tree-sitter-ci-scanner.git
 ```
 
 ## Usage
@@ -148,7 +148,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install scanner
         run: |
-          curl -sSL https://github.com/yourusername/tree-sitter-ci-scanner/releases/latest/download/scanner-x86_64-unknown-linux-gnu -o /usr/local/bin/scanner
+          curl -sSL https://github.com/crstnmac/tree-sitter-ci-scanner/releases/latest/download/scanner-x86_64-unknown-linux-gnu -o /usr/local/bin/scanner
           chmod +x /usr/local/bin/scanner
       - run: scanner scan src/ --recursive --output results.sarif
       - uses: github/codeql-action/upload-sarif@v3
@@ -220,7 +220,7 @@ Contributions welcome! Please open an issue or pull request.
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/tree-sitter-ci-scanner.git
+git clone https://github.com/crstnmac/tree-sitter-ci-scanner.git
 cd tree-sitter-ci-scanner
 
 # Build
