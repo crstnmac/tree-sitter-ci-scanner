@@ -8,24 +8,42 @@ on:
         type: string
         default: '.'
       rule-packs:
-        description: 'Comma-separated rule packs to apply. Available: javascript-security, javascript-conventions, typescript-safety, python-security, python-conventions, html-accessibility, team-conventions'
+        description: |
+          Comma-separated rule packs to apply (standalone mode only).
+          Available: javascript-security, javascript-conventions,
+          typescript-safety, python-security, python-conventions,
+          html-accessibility, team-conventions
         type: string
         default: 'javascript-security,javascript-conventions,typescript-safety'
       rules-version:
-        description: 'Tag or branch of crstnmac/tree-sitter-ci-scanner to pull rules from'
+        description: 'Tag or branch of crstnmac/tree-sitter-ci-scanner to pull rules from (standalone mode only)'
         type: string
         default: 'main'
       extra-rules:
-        description: 'Path (relative to repo root) to a repo-specific rules file to merge in'
+        description: 'Path (relative to repo root) to a repo-specific rules file to merge in (standalone mode only)'
         type: string
         default: ''
+      server-url:
+        description: |
+          Base URL of your scanner server (e.g. https://scanner.example.com).
+          When set, rules are fetched from the server and results are reported
+          back — enabling policy enforcement and the findings dashboard.
+          Omit to use standalone mode (rules from GitHub, results to GitHub Code Scanning).
+        type: string
+        default: ''
+    secrets:
+      scanner-api-key:
+        description: 'API key for the scanner server. Required when server-url is set.'
+        required: false
 
 jobs:
   scan:
-    name: Scan (${{ inputs.rule-packs }})
+    name: Scan
     runs-on: ubuntu-latest
     permissions:
-      security-events: write
+      security-events: write   # needed for standalone mode (GitHub Code Scanning upload)
+      statuses: write          # needed for server mode (commit status is posted server-side,
+                               # but the token is still used for checkout)
 
     steps:
       - name: Checkout calling repo
@@ -47,7 +65,18 @@ jobs:
           chmod +x /usr/local/bin/scanner
           echo "Scanner version: $(scanner version)"
 
+      # ── Server mode: fetch rules from the scanner server ──────────────────────
+      - name: Fetch rules from server
+        if: inputs.server-url != ''
+        run: |
+          curl -sf "${{ inputs.server-url }}/api/v1/rules" \
+            -H "Authorization: Bearer ${{ secrets.scanner-api-key }}" \
+            -o /tmp/merged-rules.yaml
+          echo "Rules fetched from server ($(wc -l < /tmp/merged-rules.yaml) lines)"
+
+      # ── Standalone mode: clone and merge rule packs from GitHub ───────────────
       - name: Fetch rule packs
+        if: inputs.server-url == ''
         run: |
           git clone --depth 1 \
             --branch ${{ inputs.rules-version }} \
@@ -55,6 +84,7 @@ jobs:
             /tmp/scanner-rules
 
       - name: Merge rule packs
+        if: inputs.server-url == ''
         run: |
           python3 - <<'EOF'
           import yaml, os, sys
@@ -95,6 +125,7 @@ jobs:
           print(f"\nTotal: {len(merged['rules'])} rules active")
           EOF
 
+      # ── Scan ──────────────────────────────────────────────────────────────────
       - name: Run scanner
         run: |
           scanner scan ${{ inputs.scan-path }} \
@@ -103,20 +134,46 @@ jobs:
             --output results.sarif
         continue-on-error: true
 
-      - name: Upload SARIF results
-        if: always() && hashFiles('results.sarif') != ''
+      # ── Server mode: POST results; server posts GitHub commit status ──────────
+      - name: Report results to server
+        if: always() && inputs.server-url != ''
+        run: |
+          if [ ! -f results.sarif ]; then
+            echo "::warning::No SARIF output — scanner may have failed to run"
+            exit 0
+          fi
+          jq -n \
+            --arg repo    "${{ github.repository }}" \
+            --arg sha     "${{ github.sha }}" \
+            --arg branch  "${{ github.ref_name }}" \
+            --slurpfile sarif results.sarif \
+            '{repo: $repo, commit_sha: $sha, branch: $branch, sarif: $sarif[0]}' \
+          | curl -sf -X POST "${{ inputs.server-url }}/api/v1/scan" \
+              -H "Authorization: Bearer ${{ secrets.scanner-api-key }}" \
+              -H "Content-Type: application/json" \
+              -d @-
+          echo "Results reported to server."
+
+      # ── Standalone mode: upload to GitHub Code Scanning ───────────────────────
+      - name: Upload SARIF to GitHub Code Scanning
+        if: always() && inputs.server-url == '' && hashFiles('results.sarif') != ''
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: results.sarif
           category: scanner
 
+      # ── Summary (both modes) ──────────────────────────────────────────────────
       - name: Summary
         if: always()
         run: |
           {
             echo "## Scan Results"
-            echo "**Rule packs:** \`${{ inputs.rule-packs }}\`"
-            echo "**Rules version:** \`${{ inputs.rules-version }}\`"
+            if [ "${{ inputs.server-url }}" != "" ]; then
+              echo "**Mode:** Server ([dashboard](${{ inputs.server-url }}))"
+            else
+              echo "**Mode:** Standalone (GitHub Code Scanning)"
+              echo "**Rule packs:** \`${{ inputs.rule-packs }}\`"
+            fi
             echo ""
             if [ ! -f results.sarif ]; then
               echo ":x: Scanner failed to run or produced no output."

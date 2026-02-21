@@ -20,7 +20,7 @@
     <a href="#queries"          class="block text-blue-600 hover:underline">5. Tree-sitter query primer</a>
     <a href="#predicates"       class="block text-blue-600 hover:underline">6. Predicates (#eq?, #match?)</a>
     <a href="#examples"         class="block text-blue-600 hover:underline">7. Example rules</a>
-    <a href="#connect"          class="block text-blue-600 hover:underline">8. Connecting your rules repo</a>
+    <a href="#connect"          class="block text-blue-600 hover:underline">8. Connecting a repository to this server</a>
   </nav>
 
   <!-- 1. Rule file format -->
@@ -378,39 +378,94 @@
     </div>
   </section>
 
-  <!-- 8. Connect rules repo -->
+  <!-- 8. Connect a repo -->
   <section id="connect" class="mb-12">
-    <h2 class="text-lg font-semibold mb-3 pb-2 border-b border-slate-200">8. Connecting your rules repo</h2>
-    <ol class="text-sm text-slate-600 space-y-4 list-decimal list-inside">
-      <li>
-        <strong>Create a GitHub repository</strong> and commit your
-        <code class="bg-slate-100 px-1 rounded">rules.yaml</code> to its root.
-      </li>
-      <li>
-        <strong>Open <a href="/settings" class="text-blue-600 hover:underline">Settings</a></strong>
-        and set <em>Rules repository</em> to <code class="bg-slate-100 px-1 rounded">owner/repo</code>
-        and <em>Rules ref</em> to the branch or tag to track (e.g. <code class="bg-slate-100 px-1 rounded">main</code>).
-      </li>
-      <li>
-        <strong>Optionally paste a GitHub PAT</strong> with
-        <code class="bg-slate-100 px-1 rounded">contents:read</code> scope if the repository is private.
-        The PAT is stored encrypted (AES-256-GCM) and never logged.
-      </li>
-      <li>
-        <strong>Fetch rules from CI</strong> using your API key:
-        <pre class="mt-2 bg-slate-900 text-slate-100 text-xs rounded-lg p-3 overflow-x-auto"><code>curl -H "Authorization: Bearer $SCANNER_API_KEY" \
-     https://your-server/api/v1/rules \
-     -o merged-rules.yaml
+    <h2 class="text-lg font-semibold mb-3 pb-2 border-b border-slate-200">8. Connecting a repository to this server</h2>
+    <p class="text-sm text-slate-500 mb-6">
+      Three steps: configure the server, add a secret, add a workflow file.
+      The scanner runs inside the CI job — source code never leaves GitHub.
+    </p>
 
-scanner scan ./src --recursive --config merged-rules.yaml</code></pre>
-        The server caches the rules file with ETag so subsequent calls skip the GitHub download when nothing has changed.
-      </li>
-      <li>
-        <strong>Create an API key</strong> for each CI environment at
-        <a href="/settings/keys" class="text-blue-600 hover:underline">Settings → API Keys</a>.
-        The key is shown once — copy it to your CI secrets immediately.
-      </li>
-    </ol>
+    <!-- Step 1 -->
+    <div class="mb-8">
+      <h3 class="text-sm font-semibold text-slate-700 mb-3">Step 1 — Configure the server (admin, once per org)</h3>
+      <ol class="text-sm text-slate-600 space-y-3 list-decimal list-inside">
+        <li>
+          <strong>Rules repo:</strong> go to
+          <a href="/settings" class="text-blue-600 hover:underline">Settings</a>
+          and set <em>Rules repository</em> to <code class="bg-slate-100 px-1 rounded">owner/repo</code>
+          and <em>Rules ref</em> to the branch or tag to track (e.g. <code class="bg-slate-100 px-1 rounded">main</code>).
+          If the repo is private, paste a GitHub PAT with <code class="bg-slate-100 px-1 rounded">contents:read</code> scope — it is stored encrypted and never logged.
+        </li>
+        <li>
+          <strong>Policy:</strong> set the enforcement policy JSON, for example:
+          <pre class="mt-2 bg-slate-900 text-slate-100 text-xs rounded-lg p-3 overflow-x-auto"><code>{ "fail_on_severity": ["error"], "block_merge": true }</code></pre>
+          <code class="bg-slate-100 px-1 rounded">fail_on_severity</code> controls which severity levels count as a failure.
+          <code class="bg-slate-100 px-1 rounded">block_merge</code> sets the GitHub commit status to
+          <em>failure</em> (red ✗) when the threshold is exceeded.
+        </li>
+        <li>
+          <strong>API key:</strong> go to
+          <a href="/settings/keys" class="text-blue-600 hover:underline">Settings → API Keys</a>
+          and create a key for the team or repo. The raw key is shown once — copy it immediately.
+        </li>
+      </ol>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="mb-8">
+      <h3 class="text-sm font-semibold text-slate-700 mb-3">Step 2 — Add the secret to the GitHub repository</h3>
+      <p class="text-sm text-slate-600 mb-2">
+        In the target repo, go to <strong>Settings → Secrets and variables → Actions → New repository secret</strong>:
+      </p>
+      <pre class="bg-slate-900 text-slate-100 text-xs rounded-lg p-3 overflow-x-auto"><code>Name:  SCANNER_API_KEY
+Value: &lt;the key from step 1&gt;</code></pre>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="mb-8">
+      <h3 class="text-sm font-semibold text-slate-700 mb-3">Step 3 — Add a workflow file</h3>
+      <p class="text-sm text-slate-600 mb-3">
+        Create <code class="bg-slate-100 px-1 rounded">.github/workflows/scan.yml</code> in the target repo
+        and call the reusable workflow with <code class="bg-slate-100 px-1 rounded">server-url</code> set.
+        That single input switches the workflow from standalone mode into server mode.
+      </p>
+      <pre class="bg-slate-900 text-slate-100 text-xs rounded-lg p-4 overflow-x-auto leading-relaxed"><code>name: Code Scan
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  scan:
+    uses: crstnmac/tree-sitter-ci-scanner/.github/workflows/reusable-scan.yml@main
+    with:
+      scan-path: '.'
+      server-url: 'https://scanner.example.com'   # &lt;-- your server URL
+    secrets:
+      scanner-api-key: ${{ secrets.SCANNER_API_KEY }}
+    permissions:
+      security-events: write
+      statuses: write</code></pre>
+      <p class="text-sm text-slate-500 mt-3">
+        <strong>What happens on each push / PR:</strong>
+      </p>
+      <ol class="text-sm text-slate-600 mt-2 space-y-1 list-decimal list-inside">
+        <li>The workflow fetches your org's merged rules from <code class="bg-slate-100 px-1 rounded">GET /api/v1/rules</code> (ETag-cached — no re-download if rules haven't changed).</li>
+        <li>The scanner binary runs locally inside the CI runner.</li>
+        <li>SARIF results are POSTed to <code class="bg-slate-100 px-1 rounded">POST /api/v1/scan</code>.</li>
+        <li>The server evaluates policy, writes findings to the database, and posts a GitHub commit status (✅ or ❌) on the commit.</li>
+        <li>Findings appear in the <a href="/findings" class="text-blue-600 hover:underline">Findings</a> dashboard.</li>
+      </ol>
+    </div>
+
+    <!-- Standalone mode note -->
+    <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600">
+      <strong>Standalone mode (no server):</strong> omit <code class="bg-slate-100 px-1 rounded">server-url</code> and
+      <code class="bg-slate-100 px-1 rounded">scanner-api-key</code>. The workflow will clone rules directly from
+      this GitHub repository and upload SARIF to GitHub Code Scanning instead.
+      Useful for open-source projects or before you have a server running.
+    </div>
   </section>
 
 </div>
