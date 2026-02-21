@@ -1,0 +1,21 @@
+{% for f in findings %}
+<tr class="hover:bg-slate-50">
+  <td class="px-4 py-2">
+    {% if f.severity == "error" %}
+      <span class="inline-block bg-red-100 text-red-700 text-xs font-medium px-2 py-0.5 rounded-full">error</span>
+    {% else if f.severity == "warning" %}
+      <span class="inline-block bg-yellow-100 text-yellow-700 text-xs font-medium px-2 py-0.5 rounded-full">warning</span>
+    {% else %}
+      <span class="inline-block bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full">note</span>
+    {% endif %}
+  </td>
+  <td class="px-4 py-2 font-mono text-xs">{{ f.rule_id }}</td>
+  <td class="px-4 py-2 font-mono text-xs text-slate-600 max-w-xs truncate" title="{{ f.file_path }}">{{ f.file_path }}</td>
+  <td class="px-4 py-2 text-slate-500">
+    {% if let Some(ln) = f.line_number %}{{ ln }}{% else %}—{% endif %}
+  </td>
+  <td class="px-4 py-2 text-slate-700 max-w-sm truncate" title="{{ f.message }}">{{ f.message }}</td>
+  <td class="px-4 py-2 font-mono text-xs text-slate-500">{{ f.repo }}</td>
+  <td class="px-4 py-2 text-slate-400 text-xs whitespace-nowrap">{{ f.scan_at.format("%m-%d %H:%M") }}</td>
+</tr>
+{% endfor %}

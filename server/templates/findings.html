@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Findings — Scanner{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-xl font-semibold">Findings</h1>
+  <!-- Severity filter buttons (HTMX) -->
+  <div class="flex gap-2 text-sm">
+    <button
+      hx-get="/findings"
+      hx-target="#findings-body"
+      hx-swap="innerHTML"
+      hx-indicator="#spinner"
+      class="px-3 py-1 rounded border border-slate-300 hover:bg-slate-100 {% if severity_filter.is_none() %}bg-slate-800 text-white border-slate-800{% endif %}">
+      All
+    </button>
+    {% for sev in ["error", "warning", "note"] %}
+    <button
+      hx-get="/findings?severity={{ sev }}"
+      hx-target="#findings-body"
+      hx-swap="innerHTML"
+      hx-indicator="#spinner"
+      class="px-3 py-1 rounded border border-slate-300 hover:bg-slate-100 capitalize
+        {% if let Some(f) = severity_filter.as_ref() %}{% if f == sev %}bg-slate-800 text-white border-slate-800{% endif %}{% endif %}">
+      {{ sev }}
+    </button>
+    {% endfor %}
+    <span id="spinner" class="htmx-indicator ml-2 text-slate-400">⟳</span>
+  </div>
+</div>
+
+{% if findings.is_empty() %}
+<div class="text-center py-16 text-slate-400">
+  <p>No findings found.</p>
+</div>
+{% else %}
+<div class="overflow-hidden rounded-lg shadow border border-slate-200 bg-white">
+  <table class="w-full text-sm">
+    <thead class="bg-slate-50 text-slate-500 uppercase text-xs">
+      <tr>
+        <th class="px-4 py-3 text-left w-24">Severity</th>
+        <th class="px-4 py-3 text-left">Rule</th>
+        <th class="px-4 py-3 text-left">File</th>
+        <th class="px-4 py-3 text-left">Line</th>
+        <th class="px-4 py-3 text-left">Message</th>
+        <th class="px-4 py-3 text-left">Repo</th>
+        <th class="px-4 py-3 text-left">Scanned</th>
+      </tr>
+    </thead>
+    <tbody id="findings-body" class="divide-y divide-slate-100">
+      {% include "partials/findings_rows.html" %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

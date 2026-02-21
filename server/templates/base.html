@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Scanner{% endblock %}</title>
+  <script src="https://unpkg.com/htmx.org@1.9.12" crossorigin="anonymous"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+  <!-- Navbar -->
+  <nav class="bg-slate-900 text-white px-6 py-3 flex items-center justify-between shadow">
+    <div class="flex items-center gap-6 text-sm font-medium">
+      <a href="/" class="text-white hover:text-slate-300">🔍 Scanner</a>
+      <a href="/" class="hover:text-slate-300">Repositories</a>
+      <a href="/findings" class="hover:text-slate-300">Findings</a>
+      <a href="/docs/rules" class="hover:text-slate-300">Docs</a>
+      {% if user.is_admin %}
+      <a href="/settings" class="hover:text-slate-300">Settings</a>
+      <a href="/settings/keys" class="hover:text-slate-300">API Keys</a>
+      {% endif %}
+    </div>
+    <div class="flex items-center gap-3 text-sm">
+      <span class="text-slate-300">
+        {% if let Some(name) = user.name.as_ref() %}{{ name }}{% else %}{{ user.login }}{% endif %}
+      </span>
+      {% if let Some(avatar) = user.avatar_url.as_ref() %}
+      <img src="{{ avatar }}" class="w-7 h-7 rounded-full" alt="avatar" />
+      {% endif %}
+      <form method="post" action="/auth/logout">
+        <button type="submit" class="text-slate-400 hover:text-white">Logout</button>
+      </form>
+    </div>
+  </nav>
+
+  <!-- Main content -->
+  <main class="max-w-6xl mx-auto px-6 py-8">
+    {% block content %}{% endblock %}
+  </main>
+
+</body>
+</html>

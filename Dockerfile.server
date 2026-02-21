@@ -1,0 +1,56 @@
+# ── Stage 1: Build ────────────────────────────────────────────────────────────
+FROM rust:1.88-slim-bookworm AS builder
+
+WORKDIR /app
+
+# System dependencies (needed for ring/rustls)
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends pkg-config \
+ && rm -rf /var/lib/apt/lists/*
+
+# Copy workspace manifests first for layer-cached dependency compilation
+COPY Cargo.toml Cargo.lock ./
+COPY server/Cargo.toml server/
+
+# Create stub source files so cargo can resolve and compile all dependencies
+RUN mkdir -p src server/src \
+ && echo 'pub fn lib() {}' > src/lib.rs \
+ && echo 'fn main() {}' > src/main.rs \
+ && echo 'fn main() {}' > server/src/main.rs
+
+RUN cargo build --release -p server 2>&1 | grep -v "^warning" || true
+
+# Remove stub artifacts so the real build picks up changes
+RUN rm -rf src/lib.rs src/main.rs server/src/main.rs \
+    target/release/.fingerprint/scanner-* \
+    target/release/.fingerprint/server-*
+
+# Copy real source and templates (migrations are embedded by sqlx::migrate!)
+COPY src/ src/
+COPY server/src/ server/src/
+COPY server/templates/ server/templates/
+
+# Final binary build
+RUN cargo build --release -p server
+
+# ── Stage 2: Runtime ──────────────────────────────────────────────────────────
+FROM debian:bookworm-slim AS runtime
+
+# ca-certificates needed for outbound TLS (GitHub API)
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=builder /app/target/release/server /app/server
+
+# Non-root user for least-privilege execution
+RUN useradd -r -s /bin/false scanner \
+ && chown scanner:scanner /app/server
+
+USER scanner
+
+EXPOSE 3000
+
+CMD ["/app/server"]

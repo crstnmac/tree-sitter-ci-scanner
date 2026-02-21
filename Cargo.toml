@@ -1,14 +1,33 @@
-[package]
-name = "scanner"
+[workspace]
+members = [".", "server"]
+resolver = "2"
+
+[workspace.package]
 version = "0.1.0"
 edition = "2021"
-description = "A fast, tree-sitter based static analysis tool for CI/CD"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/crstnmac/tree-sitter-ci-scanner"
 
+[workspace.dependencies]
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+anyhow = "1.0"
+thiserror = "1.0"
+tracing = "0.1"
+
+[package]
+name = "scanner"
+version.workspace = true
+edition.workspace = true
+description = "A fast, tree-sitter based static analysis tool for CI/CD"
+license.workspace = true
+repository.workspace = true
+
 [dependencies]
 # Async runtime
-tokio = { version = "1.35", features = ["full"] }
+tokio = { workspace = true }
 
 # Parallelism
 rayon = "1.8"
@@ -17,9 +36,9 @@ rayon = "1.8"
 clap = { version = "4.4", features = ["derive"] }
 
 # Serialization
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-serde_yaml = "0.9"
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
 
 # Tree-sitter
 tree-sitter = "0.22"
@@ -28,17 +47,15 @@ tree-sitter-typescript = "0.21"
 tree-sitter-python = "0.21"
 tree-sitter-html = "0.20"
 
-# SARIF (we'll implement it manually with serde_json)
-
 # File system
 walkdir = "2.4"
 
 # Error handling
-anyhow = "1.0"
-thiserror = "1.0"
+anyhow = { workspace = true }
+thiserror = { workspace = true }
 
 # Logging
-tracing = "0.1"
+tracing = { workspace = true }
 tracing-subscriber = "0.3"
 
 [dev-dependencies]

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Settings — Scanner{% endblock %}
+
+{% block content %}
+<h1 class="text-xl font-semibold mb-6">Organisation Settings</h1>
+<p class="text-sm text-slate-500 mb-6">Org: <strong>{{ org_login }}</strong></p>
+
+{% if let Some(msg) = flash.as_ref() %}
+<div class="mb-4 px-4 py-3 bg-green-50 text-green-700 rounded border border-green-200 text-sm">{{ msg }}</div>
+{% endif %}
+
+<form method="post" action="/settings" class="max-w-xl space-y-5">
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">Rules repository</label>
+    <input type="text" name="rules_repo" value="{{ rules_repo }}"
+      placeholder="owner/repo"
+      class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+    <p class="mt-1 text-xs text-slate-400">GitHub repository containing your <code>rules.yaml</code> file.</p>
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">Rules ref</label>
+    <input type="text" name="rules_ref" value="{{ rules_ref }}"
+      placeholder="main"
+      class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+    <p class="mt-1 text-xs text-slate-400">Branch, tag, or SHA to fetch rules from.</p>
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">Policy JSON</label>
+    <textarea name="policy_json" rows="6"
+      class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500">{{ policy_json }}</textarea>
+    <p class="mt-1 text-xs text-slate-400">
+      Example: <code>{"fail_on_severity":["error"],"block_merge":true}</code>
+    </p>
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">GitHub PAT <span class="font-normal text-slate-400">(optional — leave blank to keep existing)</span></label>
+    <input type="password" name="github_pat"
+      placeholder="ghp_..."
+      class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+    <p class="mt-1 text-xs text-slate-400">
+      Needs <code>repo:status</code> scope for commit statuses.
+      Stored encrypted (AES-256-GCM) in the database.
+    </p>
+  </div>
+
+  <div>
+    <button type="submit"
+      class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded">
+      Save settings
+    </button>
+  </div>
+</form>
+{% endblock %}

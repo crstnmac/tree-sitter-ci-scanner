@@ -1,0 +1,417 @@
+{% extends "base.html" %}
+
+{% block title %}Rule Authoring Guide — Scanner{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl">
+
+  <h1 class="text-xl font-semibold mb-1">Rule Authoring Guide</h1>
+  <p class="text-sm text-slate-500 mb-8">
+    Everything you need to write custom tree-sitter rules and wire them to your organisation.
+  </p>
+
+  <!-- TOC -->
+  <nav class="mb-10 p-4 bg-slate-100 rounded-lg text-sm space-y-1">
+    <p class="font-semibold text-slate-600 mb-2">Contents</p>
+    <a href="#rule-format"      class="block text-blue-600 hover:underline">1. Rule file format</a>
+    <a href="#fields"           class="block text-blue-600 hover:underline">2. Field reference</a>
+    <a href="#severities"       class="block text-blue-600 hover:underline">3. Severity levels</a>
+    <a href="#languages"        class="block text-blue-600 hover:underline">4. Supported languages</a>
+    <a href="#queries"          class="block text-blue-600 hover:underline">5. Tree-sitter query primer</a>
+    <a href="#predicates"       class="block text-blue-600 hover:underline">6. Predicates (#eq?, #match?)</a>
+    <a href="#examples"         class="block text-blue-600 hover:underline">7. Example rules</a>
+    <a href="#connect"          class="block text-blue-600 hover:underline">8. Connecting your rules repo</a>
+  </nav>
+
+  <!-- 1. Rule file format -->
+  <section id="rule-format" class="mb-12">
+    <h2 class="text-lg font-semibold mb-3 pb-2 border-b border-slate-200">1. Rule file format</h2>
+    <p class="text-sm text-slate-600 mb-4">
+      Rules are stored in a YAML file with a top-level <code class="bg-slate-100 px-1 rounded">rules</code> list.
+      Each entry is one rule. The file can live anywhere in your rules repository — by convention it is
+      named <code class="bg-slate-100 px-1 rounded">rules.yaml</code> at the repo root.
+    </p>
+    <pre class="bg-slate-900 text-slate-100 text-xs rounded-lg p-4 overflow-x-auto leading-relaxed"><code>rules:
+  - id: js-no-eval
+    name: No eval()
+    severity: error
+    language: javascript
+    query: |
+      (call_expression
+        function: (identifier) @fn
+        (#eq? @fn "eval"))
+    message: "eval() executes arbitrary strings as code and is a critical security risk"
+
+  - id: js-no-alert
+    name: No alert/confirm/prompt
+    severity: warning
+    language: javascript
+    query: |
+      (call_expression
+        function: (identifier) @fn
+        (#match? @fn "^(alert|confirm|prompt)$"))
+    message: "Browser dialogs block the thread and should not reach production"</code></pre>
+  </section>
+
+  <!-- 2. Field reference -->
+  <section id="fields" class="mb-12">
+    <h2 class="text-lg font-semibold mb-3 pb-2 border-b border-slate-200">2. Field reference</h2>
+    <div class="overflow-hidden rounded-lg border border-slate-200">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-50 text-slate-500 uppercase text-xs">
+          <tr>
+            <th class="px-4 py-3 text-left w-32">Field</th>
+            <th class="px-4 py-3 text-left w-24">Required</th>
+            <th class="px-4 py-3 text-left">Description</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          <tr>
+            <td class="px-4 py-3 font-mono font-medium">id</td>
+            <td class="px-4 py-3 text-green-700 font-medium">Yes</td>
+            <td class="px-4 py-3 text-slate-600">
+              Unique identifier. Appears in SARIF output and findings table.
+              Convention: <code class="bg-slate-100 px-1 rounded">lang-short-description</code>
+              (e.g. <code class="bg-slate-100 px-1 rounded">js-no-eval</code>).
+            </td>
+          </tr>
+          <tr class="bg-slate-50/50">
+            <td class="px-4 py-3 font-mono font-medium">name</td>
+            <td class="px-4 py-3 text-green-700 font-medium">Yes</td>
+            <td class="px-4 py-3 text-slate-600">Human-readable rule name shown in reports.</td>
+          </tr>
+          <tr>
+            <td class="px-4 py-3 font-mono font-medium">severity</td>
+            <td class="px-4 py-3 text-green-700 font-medium">Yes</td>
+            <td class="px-4 py-3 text-slate-600">
+              One of <code class="bg-slate-100 px-1 rounded">error</code>,
+              <code class="bg-slate-100 px-1 rounded">warning</code>, or
+              <code class="bg-slate-100 px-1 rounded">note</code>.
+              Maps to the SARIF <code class="bg-slate-100 px-1 rounded">level</code> field.
+            </td>
+          </tr>
+          <tr class="bg-slate-50/50">
+            <td class="px-4 py-3 font-mono font-medium">language</td>
+            <td class="px-4 py-3 text-green-700 font-medium">Yes</td>
+            <td class="px-4 py-3 text-slate-600">
+              Target language (case-insensitive). See <a href="#languages" class="text-blue-600 hover:underline">§4</a>
+              for the full list.
+            </td>
+          </tr>
+          <tr>
+            <td class="px-4 py-3 font-mono font-medium">query</td>
+            <td class="px-4 py-3 text-green-700 font-medium">Yes</td>
+            <td class="px-4 py-3 text-slate-600">
+              Tree-sitter S-expression query. Every capture (<code class="bg-slate-100 px-1 rounded">@name</code>)
+              that matches produces one finding. See <a href="#queries" class="text-blue-600 hover:underline">§5</a>.
+            </td>
+          </tr>
+          <tr class="bg-slate-50/50">
+            <td class="px-4 py-3 font-mono font-medium">message</td>
+            <td class="px-4 py-3 text-green-700 font-medium">Yes</td>
+            <td class="px-4 py-3 text-slate-600">
+              Explanation shown alongside each finding. Should explain the risk and suggest a fix.
+            </td>
+          </tr>
+          <tr>
+            <td class="px-4 py-3 font-mono font-medium">metadata</td>
+            <td class="px-4 py-3 text-slate-400">No</td>
+            <td class="px-4 py-3 text-slate-600">
+              Arbitrary JSON/YAML object. Use it for ticket links, CWE references, etc.
+              Not interpreted by the scanner.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 3. Severity levels -->
+  <section id="severities" class="mb-12">
+    <h2 class="text-lg font-semibold mb-3 pb-2 border-b border-slate-200">3. Severity levels</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+      <div class="p-4 rounded-lg border border-red-200 bg-red-50">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="inline-block bg-red-100 text-red-700 text-xs font-medium px-2 py-0.5 rounded-full">error</span>
+        </div>
+        <p class="text-slate-700">Blocks merge when <code class="bg-white px-1 rounded">fail_on_severity</code>
+        includes <code class="bg-white px-1 rounded">"error"</code>. Use for security vulnerabilities
+        and critical correctness issues.</p>
+      </div>
+      <div class="p-4 rounded-lg border border-yellow-200 bg-yellow-50">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="inline-block bg-yellow-100 text-yellow-700 text-xs font-medium px-2 py-0.5 rounded-full">warning</span>
+        </div>
+        <p class="text-slate-700">Visible in the findings table. Blocks merge only if
+        <code class="bg-white px-1 rounded">fail_on_severity</code> includes
+        <code class="bg-white px-1 rounded">"warning"</code>. Use for style and
+        best-practice violations.</p>
+      </div>
+      <div class="p-4 rounded-lg border border-blue-200 bg-blue-50">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="inline-block bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full">note</span>
+        </div>
+        <p class="text-slate-700">Informational only. Never blocks merge unless
+        explicitly configured. Use for suggestions and deprecation notices.</p>
+      </div>
+    </div>
+    <p class="mt-4 text-sm text-slate-500">
+      Adjust which severities fail scans in
+      <a href="/settings" class="text-blue-600 hover:underline">Settings → Policy JSON</a>:
+    </p>
+    <pre class="mt-2 bg-slate-900 text-slate-100 text-xs rounded-lg p-4"><code>{
+  "fail_on_severity": ["error", "warning"],
+  "block_merge": true
+}</code></pre>
+  </section>
+
+  <!-- 4. Supported languages -->
+  <section id="languages" class="mb-12">
+    <h2 class="text-lg font-semibold mb-3 pb-2 border-b border-slate-200">4. Supported languages</h2>
+    <div class="overflow-hidden rounded-lg border border-slate-200">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-50 text-slate-500 uppercase text-xs">
+          <tr>
+            <th class="px-4 py-3 text-left">language value</th>
+            <th class="px-4 py-3 text-left">File extensions scanned</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          <tr><td class="px-4 py-3 font-mono">javascript</td><td class="px-4 py-3 text-slate-600"><code>.js .jsx .mjs .cjs</code></td></tr>
+          <tr class="bg-slate-50/50"><td class="px-4 py-3 font-mono">typescript</td><td class="px-4 py-3 text-slate-600"><code>.ts .tsx</code></td></tr>
+          <tr><td class="px-4 py-3 font-mono">python</td><td class="px-4 py-3 text-slate-600"><code>.py</code></td></tr>
+          <tr class="bg-slate-50/50"><td class="px-4 py-3 font-mono">html</td><td class="px-4 py-3 text-slate-600"><code>.html .htm</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="mt-3 text-xs text-slate-400">
+      Language matching is case-insensitive.
+      <code class="bg-slate-100 px-1 rounded">JavaScript</code> and
+      <code class="bg-slate-100 px-1 rounded">javascript</code> are equivalent.
+    </p>
+  </section>
+
+  <!-- 5. Query primer -->
+  <section id="queries" class="mb-12">
+    <h2 class="text-lg font-semibold mb-3 pb-2 border-b border-slate-200">5. Tree-sitter query primer</h2>
+    <p class="text-sm text-slate-600 mb-4">
+      Queries are written in S-expression syntax. Each node type maps to a grammar node
+      in the target language's tree-sitter grammar. Wrap a node with
+      <code class="bg-slate-100 px-1 rounded">@capture_name</code> to mark it as a finding location.
+    </p>
+
+    <h3 class="text-sm font-semibold text-slate-700 mb-2">Match a function call by name</h3>
+    <pre class="bg-slate-900 text-slate-100 text-xs rounded-lg p-4 mb-6 overflow-x-auto"><code>; Matches:  eval("code")
+(call_expression
+  function: (identifier) @fn
+  (#eq? @fn "eval"))</code></pre>
+
+    <h3 class="text-sm font-semibold text-slate-700 mb-2">Match a method call on a specific object</h3>
+    <pre class="bg-slate-900 text-slate-100 text-xs rounded-lg p-4 mb-6 overflow-x-auto"><code>; Matches:  document.write(...)
+(call_expression
+  function: (member_expression
+    object:   (identifier) @obj (#eq? @obj "document")
+    property: (property_identifier) @prop (#eq? @prop "write")))</code></pre>
+
+    <h3 class="text-sm font-semibold text-slate-700 mb-2">Match a property assignment</h3>
+    <pre class="bg-slate-900 text-slate-100 text-xs rounded-lg p-4 mb-6 overflow-x-auto"><code>; Matches:  element.innerHTML = ...
+(assignment_expression
+  left: (member_expression
+    property: (property_identifier) @prop
+    (#eq? @prop "innerHTML")))</code></pre>
+
+    <h3 class="text-sm font-semibold text-slate-700 mb-2">Match a comment containing a keyword</h3>
+    <pre class="bg-slate-900 text-slate-100 text-xs rounded-lg p-4 mb-6 overflow-x-auto"><code>; Matches:  // @ts-ignore
+(comment) @c
+(#match? @c "@ts-ignore")</code></pre>
+
+    <h3 class="text-sm font-semibold text-slate-700 mb-2">Match a JSX attribute (React)</h3>
+    <pre class="bg-slate-900 text-slate-100 text-xs rounded-lg p-4 mb-6 overflow-x-auto"><code>; Matches:  &lt;div dangerouslySetInnerHTML={...} /&gt;
+(jsx_attribute
+  (jsx_attribute_name) @attr
+  (#eq? @attr "dangerouslySetInnerHTML"))</code></pre>
+
+    <h3 class="text-sm font-semibold text-slate-700 mb-2">Python — function call</h3>
+    <pre class="bg-slate-900 text-slate-100 text-xs rounded-lg p-4 overflow-x-auto"><code>; Matches:  eval("code")   [Python grammar uses `call`, not `call_expression`]
+(call
+  function: (identifier) @fn
+  (#eq? @fn "eval"))</code></pre>
+  </section>
+
+  <!-- 6. Predicates -->
+  <section id="predicates" class="mb-12">
+    <h2 class="text-lg font-semibold mb-3 pb-2 border-b border-slate-200">6. Predicates</h2>
+    <p class="text-sm text-slate-600 mb-4">
+      Predicates filter which captures produce findings. They must appear inside the same
+      S-expression as the capture they reference.
+    </p>
+    <div class="overflow-hidden rounded-lg border border-slate-200 mb-4">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-50 text-slate-500 uppercase text-xs">
+          <tr>
+            <th class="px-4 py-3 text-left">Predicate</th>
+            <th class="px-4 py-3 text-left">Tests</th>
+            <th class="px-4 py-3 text-left">Example</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          <tr>
+            <td class="px-4 py-3 font-mono">#eq?</td>
+            <td class="px-4 py-3 text-slate-600">Exact string equality</td>
+            <td class="px-4 py-3 font-mono text-xs text-slate-500">(#eq? @fn "eval")</td>
+          </tr>
+          <tr class="bg-slate-50/50">
+            <td class="px-4 py-3 font-mono">#match?</td>
+            <td class="px-4 py-3 text-slate-600">Regex match</td>
+            <td class="px-4 py-3 font-mono text-xs text-slate-500">(#match? @fn "^(alert|confirm)$")</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="text-sm text-slate-500 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+      <strong class="text-blue-800">Tip:</strong>
+      Use <code class="bg-white px-1 rounded">#match?</code> with anchors
+      (<code class="bg-white px-1 rounded">^...$</code>) to avoid partial matches.
+      For example, <code class="bg-white px-1 rounded">#match? @fn "^eval$"</code>
+      will not match a function named <code class="bg-white px-1 rounded">evalSomething</code>.
+    </div>
+  </section>
+
+  <!-- 7. Example rules -->
+  <section id="examples" class="mb-12">
+    <h2 class="text-lg font-semibold mb-3 pb-2 border-b border-slate-200">7. Example rules</h2>
+
+    <div class="space-y-6">
+
+      <!-- js-no-settimeout-string -->
+      <div>
+        <div class="flex items-center gap-2 mb-2">
+          <span class="font-mono text-sm font-medium text-slate-800">js-no-settimeout-string</span>
+          <span class="inline-block bg-red-100 text-red-700 text-xs font-medium px-2 py-0.5 rounded-full">error</span>
+          <span class="text-xs text-slate-400">javascript</span>
+        </div>
+        <p class="text-sm text-slate-600 mb-2">
+          Catches <code class="bg-slate-100 px-1 rounded">setTimeout("code", ms)</code> — passing a string
+          is equivalent to <code class="bg-slate-100 px-1 rounded">eval()</code>.
+        </p>
+        <pre class="bg-slate-900 text-slate-100 text-xs rounded-lg p-4 overflow-x-auto"><code>- id: js-no-settimeout-string
+  name: No setTimeout with string argument
+  severity: error
+  language: javascript
+  query: |
+    (call_expression
+      function: (identifier) @fn
+      (#match? @fn "^(setTimeout|setInterval)$")
+      arguments: (arguments
+        (string) .))
+  message: "Passing a string to setTimeout/setInterval is equivalent to eval()"</code></pre>
+      </div>
+
+      <!-- ts-no-any -->
+      <div>
+        <div class="flex items-center gap-2 mb-2">
+          <span class="font-mono text-sm font-medium text-slate-800">ts-no-as-any</span>
+          <span class="inline-block bg-red-100 text-red-700 text-xs font-medium px-2 py-0.5 rounded-full">error</span>
+          <span class="text-xs text-slate-400">typescript</span>
+        </div>
+        <p class="text-sm text-slate-600 mb-2">
+          Catches <code class="bg-slate-100 px-1 rounded">value as any</code> type assertions.
+        </p>
+        <pre class="bg-slate-900 text-slate-100 text-xs rounded-lg p-4 overflow-x-auto"><code>- id: ts-no-as-any
+  name: No 'as any' type assertion
+  severity: error
+  language: typescript
+  query: |
+    (as_expression
+      type: (predefined_type) @type
+      (#eq? @type "any"))
+  message: "'as any' disables type checking entirely. Use a specific type assertion"</code></pre>
+      </div>
+
+      <!-- py-no-pickle -->
+      <div>
+        <div class="flex items-center gap-2 mb-2">
+          <span class="font-mono text-sm font-medium text-slate-800">py-no-pickle-loads</span>
+          <span class="inline-block bg-red-100 text-red-700 text-xs font-medium px-2 py-0.5 rounded-full">error</span>
+          <span class="text-xs text-slate-400">python</span>
+        </div>
+        <p class="text-sm text-slate-600 mb-2">
+          Catches <code class="bg-slate-100 px-1 rounded">pickle.loads()</code> on untrusted data.
+        </p>
+        <pre class="bg-slate-900 text-slate-100 text-xs rounded-lg p-4 overflow-x-auto"><code>- id: py-no-pickle-loads
+  name: No pickle.loads()
+  severity: error
+  language: python
+  query: |
+    (call
+      function: (attribute
+        object:    (identifier) @obj    (#eq? @obj "pickle")
+        attribute: (identifier) @method (#eq? @method "loads")))
+  message: "pickle.loads() on untrusted data enables arbitrary code execution"</code></pre>
+      </div>
+
+      <!-- team convention -->
+      <div>
+        <div class="flex items-center gap-2 mb-2">
+          <span class="font-mono text-sm font-medium text-slate-800">team-no-console-log</span>
+          <span class="inline-block bg-yellow-100 text-yellow-700 text-xs font-medium px-2 py-0.5 rounded-full">warning</span>
+          <span class="text-xs text-slate-400">javascript · typescript</span>
+        </div>
+        <p class="text-sm text-slate-600 mb-2">
+          Ban <code class="bg-slate-100 px-1 rounded">console.log</code> in production code.
+          Add the rule twice — once per language — or create a shared rule file for each.
+        </p>
+        <pre class="bg-slate-900 text-slate-100 text-xs rounded-lg p-4 overflow-x-auto"><code>- id: team-no-console-log
+  name: No console.log
+  severity: warning
+  language: javascript
+  query: |
+    (call_expression
+      function: (member_expression
+        object:   (identifier) @obj  (#eq? @obj "console")
+        property: (property_identifier) @prop (#eq? @prop "log")))
+  message: "Remove console.log before merging"
+  metadata:
+    docs: "https://wiki.example.com/coding-standards#logging"</code></pre>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 8. Connect rules repo -->
+  <section id="connect" class="mb-12">
+    <h2 class="text-lg font-semibold mb-3 pb-2 border-b border-slate-200">8. Connecting your rules repo</h2>
+    <ol class="text-sm text-slate-600 space-y-4 list-decimal list-inside">
+      <li>
+        <strong>Create a GitHub repository</strong> and commit your
+        <code class="bg-slate-100 px-1 rounded">rules.yaml</code> to its root.
+      </li>
+      <li>
+        <strong>Open <a href="/settings" class="text-blue-600 hover:underline">Settings</a></strong>
+        and set <em>Rules repository</em> to <code class="bg-slate-100 px-1 rounded">owner/repo</code>
+        and <em>Rules ref</em> to the branch or tag to track (e.g. <code class="bg-slate-100 px-1 rounded">main</code>).
+      </li>
+      <li>
+        <strong>Optionally paste a GitHub PAT</strong> with
+        <code class="bg-slate-100 px-1 rounded">contents:read</code> scope if the repository is private.
+        The PAT is stored encrypted (AES-256-GCM) and never logged.
+      </li>
+      <li>
+        <strong>Fetch rules from CI</strong> using your API key:
+        <pre class="mt-2 bg-slate-900 text-slate-100 text-xs rounded-lg p-3 overflow-x-auto"><code>curl -H "Authorization: Bearer $SCANNER_API_KEY" \
+     https://your-server/api/v1/rules \
+     -o merged-rules.yaml
+
+scanner scan ./src --recursive --config merged-rules.yaml</code></pre>
+        The server caches the rules file with ETag so subsequent calls skip the GitHub download when nothing has changed.
+      </li>
+      <li>
+        <strong>Create an API key</strong> for each CI environment at
+        <a href="/settings/keys" class="text-blue-600 hover:underline">Settings → API Keys</a>.
+        The key is shown once — copy it to your CI secrets immediately.
+      </li>
+    </ol>
+  </section>
+
+</div>
+{% endblock %}

@@ -1,0 +1,47 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: scanner
+      POSTGRES_USER: scanner
+      POSTGRES_PASSWORD: scanner
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scanner"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://scanner:scanner@db:5432/scanner
+      PORT: 3000
+      # Override these in a .env file or via environment:
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      GITHUB_CALLBACK_URL: ${GITHUB_CALLBACK_URL:-http://localhost:3000/auth/github/callback}
+      BASE_URL: ${BASE_URL:-http://localhost:3000}
+      # Generate with: openssl rand -hex 64
+      COOKIE_SECRET: ${COOKIE_SECRET}
+      # Generate with: openssl rand -hex 32
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      SESSION_HOURS: ${SESSION_HOURS:-24}
+      RUST_LOG: server=info,tower_http=info
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

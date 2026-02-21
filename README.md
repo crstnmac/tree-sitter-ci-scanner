@@ -212,6 +212,117 @@ rules:
     message: "Found potential exposed API key or secret"
 ```
 
+## SaaS Dashboard Server
+
+The `server/` crate is a multi-tenant web server that adds a policy dashboard,
+cross-repo findings visibility, and GitHub commit status enforcement on top of
+the scanner CLI.
+
+### Quick start with Docker
+
+```bash
+# 1. Generate secrets
+export COOKIE_SECRET=$(openssl rand -hex 64)
+export ENCRYPTION_KEY=$(openssl rand -hex 32)
+
+# 2. Create a GitHub OAuth App at https://github.com/settings/developers
+#    Set the callback URL to: http://localhost:3000/auth/github/callback
+
+# 3. Create a .env file
+cat > .env <<EOF
+GITHUB_CLIENT_ID=your_client_id
+GITHUB_CLIENT_SECRET=your_client_secret
+GITHUB_CALLBACK_URL=http://localhost:3000/auth/github/callback
+BASE_URL=http://localhost:3000
+COOKIE_SECRET=${COOKIE_SECRET}
+ENCRYPTION_KEY=${ENCRYPTION_KEY}
+EOF
+
+# 4. Start Postgres and the server
+docker-compose up --build
+```
+
+Open http://localhost:3000 and sign in.
+
+### Running locally (without Docker)
+
+```bash
+# Start Postgres
+docker run -d --name scanner-db \
+  -e POSTGRES_DB=scanner \
+  -e POSTGRES_USER=scanner \
+  -e POSTGRES_PASSWORD=scanner \
+  -p 5432:5432 \
+  postgres:16-alpine
+
+# Source secrets
+export DATABASE_URL=postgres://scanner:scanner@localhost:5432/scanner
+export COOKIE_SECRET=$(openssl rand -hex 64)
+export ENCRYPTION_KEY=$(openssl rand -hex 32)
+export GITHUB_CLIENT_ID=your_client_id
+export GITHUB_CLIENT_SECRET=your_client_secret
+export GITHUB_CALLBACK_URL=http://localhost:3000/auth/github/callback
+export BASE_URL=http://localhost:3000
+export PORT=3000
+
+# Build and run (migrations run automatically on startup)
+cargo run -p server
+```
+
+### Authentication
+
+Two methods are supported — use whichever suits your setup:
+
+| Method | How |
+|--------|-----|
+| **Username + password** | Register at `/auth/register` |
+| **GitHub OAuth** | Click "Continue with GitHub" on the login page |
+
+The first user to create an account in an organisation becomes admin.
+
+### Server environment variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | Yes | Postgres connection string |
+| `PORT` | No (default: `3000`) | HTTP listen port |
+| `GITHUB_CLIENT_ID` | Yes | GitHub OAuth App client ID |
+| `GITHUB_CLIENT_SECRET` | Yes | GitHub OAuth App client secret |
+| `GITHUB_CALLBACK_URL` | Yes | Must match the OAuth App's callback URL |
+| `BASE_URL` | Yes | Public URL of this server |
+| `COOKIE_SECRET` | Yes | Hex-encoded ≥64-byte key for cookie encryption (`openssl rand -hex 64`) |
+| `ENCRYPTION_KEY` | Yes | Hex-encoded 32-byte key for PAT encryption at rest (`openssl rand -hex 32`) |
+| `SESSION_HOURS` | No (default: `24`) | Session lifetime in hours |
+
+### API endpoints
+
+After creating an API key at `/settings/keys`, CI jobs can call the server directly:
+
+```bash
+# Fetch merged rules for your org
+curl -H "Authorization: Bearer <key>" \
+  http://localhost:3000/api/v1/rules
+
+# Submit a SARIF result (evaluates policy + stores findings + posts GitHub status)
+curl -X POST \
+  -H "Authorization: Bearer <key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sarif": { ...sarif_log... },
+    "repo": "owner/repo",
+    "commit_sha": "abc123",
+    "branch": "main"
+  }' \
+  http://localhost:3000/api/v1/scan
+```
+
+### Build the server binary only
+
+```bash
+cargo build --release -p server
+./target/release/server
+```
+
 ## Contributing
 
 Contributions welcome! Please open an issue or pull request.

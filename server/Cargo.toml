@@ -1,0 +1,81 @@
+[package]
+name = "server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "server"
+path = "src/main.rs"
+
+[dependencies]
+# Scanner shared types
+scanner = { path = ".." }
+
+# Web framework
+axum = { version = "0.7", features = ["macros"] }
+axum-extra = { version = "0.9", features = ["cookie", "cookie-private"] }
+tower-http = { version = "0.5", features = ["trace", "cors", "compression-gzip"] }
+
+# Templates — askama_axum provides IntoResponse for Template types
+askama = { version = "0.12", features = ["with-axum"] }
+askama_axum = "0.4"
+
+# Database
+sqlx = { version = "0.7", features = [
+    "runtime-tokio-rustls",
+    "postgres",
+    "uuid",
+    "chrono",
+    "json",
+    "migrate",
+] }
+
+# Async
+tokio = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# HTTP client (for GitHub API)
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls", "blocking"] }
+
+# Types
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Crypto
+sha2 = "0.10"
+hex = "0.4"
+rand = "0.8"
+aes-gcm = "0.10"
+
+# Config
+dotenvy = "0.15"
+envy = "0.4"
+
+# Async trait
+async-trait = "0.1"
+
+# URL encoding for OAuth redirect_uri
+urlencoding = "2"
+
+# Base64 for GitHub Contents API (base64-encoded file content)
+base64 = "0.21"
+
+# Time — used for cookie max_age
+time = { version = "0.3", features = [] }
+
+# Password hashing (Argon2id — current OWASP recommendation)
+argon2 = "0.5"

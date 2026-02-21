@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Repositories — Scanner{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-xl font-semibold">Repositories</h1>
+  <span class="text-sm text-slate-500">{{ user.org_login }}</span>
+</div>
+
+{% if repos.is_empty() %}
+<div class="text-center py-16 text-slate-400">
+  <p class="text-lg">No scans yet.</p>
+  <p class="mt-2 text-sm">Push a scan result via <code class="bg-slate-100 px-1 rounded">POST /api/v1/scan</code>.</p>
+</div>
+{% else %}
+<div class="overflow-hidden rounded-lg shadow border border-slate-200 bg-white">
+  <table class="w-full text-sm">
+    <thead class="bg-slate-50 text-slate-500 uppercase text-xs">
+      <tr>
+        <th class="px-4 py-3 text-left">Repository</th>
+        <th class="px-4 py-3 text-left">Last scan</th>
+        <th class="px-4 py-3 text-left">Status</th>
+        <th class="px-4 py-3 text-right">Findings</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for repo in repos %}
+      <tr class="hover:bg-slate-50">
+        <td class="px-4 py-3 font-mono font-medium">{{ repo.repo }}</td>
+        <td class="px-4 py-3 text-slate-500">
+          {% if let Some(at) = repo.last_scan_at %}
+            {{ at.format("%Y-%m-%d %H:%M UTC") }}
+          {% else %}
+            —
+          {% endif %}
+        </td>
+        <td class="px-4 py-3">
+          {% if let Some(passed) = repo.passed %}
+            {% if passed %}
+              <span class="inline-block bg-green-100 text-green-700 text-xs font-medium px-2 py-0.5 rounded-full">✓ pass</span>
+            {% else %}
+              <span class="inline-block bg-red-100 text-red-700 text-xs font-medium px-2 py-0.5 rounded-full">✗ fail</span>
+            {% endif %}
+          {% else %}
+            <span class="text-slate-400">—</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3 text-right">
+          {% if repo.findings_count > 0 %}
+            <a href="/findings?severity=" class="text-red-600 hover:underline">{{ repo.findings_count }}</a>
+          {% else %}
+            <span class="text-slate-400">0</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}
