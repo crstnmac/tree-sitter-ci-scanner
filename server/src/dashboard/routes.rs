@@ -140,11 +140,11 @@ pub async fn findings(
             SELECT f.id, f.severity, f.rule_id, f.file_path, f.line_number, f.message,
                    r.github_repo, s.created_at AS scan_at
             FROM   findings f
-            JOIN   scans s       ON s.id  = f.scan_id
+            JOIN   scans s        ON s.id = f.scan_id
             JOIN   repositories r ON r.id = s.repo_id
-            WHERE  r.org_id   = $1
-              AND  f.severity  = $2
-            ORDER BY s.created_at DESC
+            WHERE  r.org_id  = $1
+              AND  f.severity = $2
+            ORDER BY f.severity_order, f.id DESC
             LIMIT 500
             "#,
         )
@@ -159,10 +159,10 @@ pub async fn findings(
             SELECT f.id, f.severity, f.rule_id, f.file_path, f.line_number, f.message,
                    r.github_repo, s.created_at AS scan_at
             FROM   findings f
-            JOIN   scans s       ON s.id  = f.scan_id
+            JOIN   scans s        ON s.id = f.scan_id
             JOIN   repositories r ON r.id = s.repo_id
             WHERE  r.org_id = $1
-            ORDER BY s.created_at DESC
+            ORDER BY f.severity_order, f.id DESC
             LIMIT 500
             "#,
         )

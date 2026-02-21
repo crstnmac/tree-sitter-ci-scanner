@@ -4,6 +4,22 @@ services:
   db:
     image: postgres:18-alpine
     restart: unless-stopped
+    # PG18 tuning
+    # io_method=worker  — enables PG18's async I/O framework (thread-based AIO).
+    #                     Safe on all platforms. For Linux production, swap to
+    #                     io_method=io_uring for even lower latency (kernel ≥5.1).
+    # wal_compression   — zstd (available since PG17) cuts WAL volume ~60-70%
+    #                     vs the old pglz default, reducing disk I/O and
+    #                     streaming replication bandwidth.
+    # shared_buffers    — 25% of container RAM is the standard starting point.
+    # work_mem          — per-sort/hash allocation; raise if complex queries spill.
+    command: >
+      postgres
+        -c io_method=worker
+        -c wal_compression=zstd
+        -c shared_buffers=256MB
+        -c work_mem=8MB
+        -c track_io_timing=on
     environment:
       POSTGRES_DB: scanner
       POSTGRES_USER: scanner
