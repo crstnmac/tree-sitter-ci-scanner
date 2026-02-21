@@ -358,7 +358,6 @@ jobs:
       scanner-api-key: ${{ secrets.SCANNER_API_KEY }}
     permissions:
       security-events: write
-      statuses: write
 ```
 
 On every push and pull request the workflow will:

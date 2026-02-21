@@ -42,8 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       security-events: write   # needed for standalone mode (GitHub Code Scanning upload)
-      statuses: write          # needed for server mode (commit status is posted server-side,
-                               # but the token is still used for checkout)
+      # Note: statuses are posted by the *server* using its stored PAT, not by this job.
 
     steps:
       - name: Checkout calling repo
