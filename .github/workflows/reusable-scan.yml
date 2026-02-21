@@ -1,0 +1,143 @@
+name: Reusable Code Scan
+
+on:
+  workflow_call:
+    inputs:
+      scan-path:
+        description: 'Directory to scan (relative to repo root)'
+        type: string
+        default: '.'
+      rule-packs:
+        description: 'Comma-separated rule packs to apply. Available: javascript-security, javascript-conventions, typescript-safety, python-security, python-conventions, html-accessibility, team-conventions'
+        type: string
+        default: 'javascript-security,javascript-conventions,typescript-safety'
+      rules-version:
+        description: 'Tag or branch of crstnmac/tree-sitter-ci-scanner to pull rules from'
+        type: string
+        default: 'main'
+      extra-rules:
+        description: 'Path (relative to repo root) to a repo-specific rules file to merge in'
+        type: string
+        default: ''
+
+jobs:
+  scan:
+    name: Scan (${{ inputs.rule-packs }})
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+
+    steps:
+      - name: Checkout calling repo
+        uses: actions/checkout@v4
+
+      - name: Install scanner
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=$(gh release list \
+            --repo crstnmac/tree-sitter-ci-scanner \
+            --limit 1 \
+            --json tagName \
+            --jq '.[0].tagName')
+          gh release download "$TAG" \
+            --repo crstnmac/tree-sitter-ci-scanner \
+            --pattern scanner-x86_64-unknown-linux-gnu \
+            --output /usr/local/bin/scanner
+          chmod +x /usr/local/bin/scanner
+          echo "Scanner version: $(scanner version)"
+
+      - name: Fetch rule packs
+        run: |
+          git clone --depth 1 \
+            --branch ${{ inputs.rules-version }} \
+            https://github.com/crstnmac/tree-sitter-ci-scanner.git \
+            /tmp/scanner-rules
+
+      - name: Merge rule packs
+        run: |
+          python3 - <<'EOF'
+          import yaml, os, sys
+
+          packs   = [p.strip() for p in "${{ inputs.rule-packs }}".split(',') if p.strip()]
+          rules_dir = "/tmp/scanner-rules/rules"
+          merged  = {'rules': []}
+          seen    = set()
+
+          for pack in packs:
+              path = os.path.join(rules_dir, f"{pack}.yaml")
+              if not os.path.exists(path):
+                  print(f"::warning::Rule pack '{pack}' not found — skipping", file=sys.stderr)
+                  continue
+              with open(path) as f:
+                  data = yaml.safe_load(f)
+              for rule in data.get('rules', []):
+                  if rule['id'] not in seen:
+                      merged['rules'].append(rule)
+                      seen.add(rule['id'])
+              print(f"Loaded pack: {pack} ({len(data.get('rules', []))} rules)")
+
+          extra = "${{ inputs.extra-rules }}"
+          if extra and os.path.exists(extra):
+              with open(extra) as f:
+                  data = yaml.safe_load(f)
+              added = 0
+              for rule in data.get('rules', []):
+                  if rule['id'] not in seen:
+                      merged['rules'].append(rule)
+                      seen.add(rule['id'])
+                      added += 1
+              print(f"Loaded extra rules: {extra} ({added} rules)")
+
+          with open('/tmp/merged-rules.yaml', 'w') as f:
+              yaml.dump(merged, f, default_flow_style=False)
+
+          print(f"\nTotal: {len(merged['rules'])} rules active")
+          EOF
+
+      - name: Run scanner
+        run: |
+          scanner scan ${{ inputs.scan-path }} \
+            --recursive \
+            --config /tmp/merged-rules.yaml \
+            --output results.sarif
+        continue-on-error: true
+
+      - name: Upload SARIF results
+        if: always() && hashFiles('results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: results.sarif
+          category: scanner
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Scan Results"
+            echo "**Rule packs:** \`${{ inputs.rule-packs }}\`"
+            echo "**Rules version:** \`${{ inputs.rules-version }}\`"
+            echo ""
+            if [ ! -f results.sarif ]; then
+              echo ":x: Scanner failed to run or produced no output."
+            else
+              ISSUES=$(jq '.runs[0].results | length' results.sarif 2>/dev/null || echo "0")
+              if [ "$ISSUES" -eq 0 ]; then
+                echo ":white_check_mark: No issues found."
+              else
+                echo ":warning: **$ISSUES issue(s) found.**"
+                echo ""
+                echo "| Severity | Rule | File | Line |"
+                echo "| --- | --- | --- | --- |"
+                jq -r '
+                  .runs[0].results[] |
+                  [
+                    .level // "note",
+                    .ruleId,
+                    (.locations[0].physicalLocation.artifactLocation.uri // "-"),
+                    (.locations[0].physicalLocation.region.startLine | tostring)
+                  ] | "| " + join(" | ") + " |"
+                ' results.sarif
+              fi
+            fi
+          } >> $GITHUB_STEP_SUMMARY

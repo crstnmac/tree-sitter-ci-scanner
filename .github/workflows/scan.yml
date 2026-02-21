@@ -8,62 +8,10 @@ on:
 
 jobs:
   scan:
-    name: Scan code
-    runs-on: ubuntu-latest
+    uses: crstnmac/tree-sitter-ci-scanner/.github/workflows/reusable-scan.yml@main
+    with:
+      scan-path: '.'
+      rule-packs: 'javascript-security,javascript-conventions,typescript-safety,python-security,python-conventions'
+      rules-version: 'main'
     permissions:
       security-events: write
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install scanner
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          TAG=$(gh release list --repo crstnmac/tree-sitter-ci-scanner --limit 1 --json tagName --jq '.[0].tagName')
-          gh release download "$TAG" \
-            --repo crstnmac/tree-sitter-ci-scanner \
-            --pattern scanner-x86_64-unknown-linux-gnu \
-            --output /usr/local/bin/scanner
-          chmod +x /usr/local/bin/scanner
-
-      - name: Run scanner
-        run: scanner scan . --recursive --output results.sarif
-        continue-on-error: true
-
-      - name: Upload SARIF results
-        if: always() && hashFiles('results.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: results.sarif
-          category: scanner
-
-      - name: Summary
-        if: always()
-        run: |
-          {
-            echo "## Scan Results"
-            if [ ! -f results.sarif ]; then
-              echo ":x: Scanner failed to run or produced no output."
-            else
-              ISSUES=$(jq '.runs[0].results | length' results.sarif 2>/dev/null || echo "0")
-              if [ "$ISSUES" -eq 0 ]; then
-                echo ":white_check_mark: No issues found."
-              else
-                echo ":warning: **$ISSUES issue(s) found.**"
-                echo ""
-                echo "| Severity | Rule | File | Line |"
-                echo "| --- | --- | --- | --- |"
-                jq -r '
-                  .runs[0].results[] |
-                  [
-                    .level // "note",
-                    .ruleId,
-                    (.locations[0].physicalLocation.artifactLocation.uri // "-"),
-                    (.locations[0].physicalLocation.region.startLine | tostring)
-                  ] | "| " + join(" | ") + " |"
-                ' results.sarif
-              fi
-            fi
-          } >> $GITHUB_STEP_SUMMARY
