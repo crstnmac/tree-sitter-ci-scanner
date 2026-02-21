@@ -316,6 +316,63 @@ curl -X POST \
   http://localhost:3000/api/v1/scan
 ```
 
+### Connecting a repository to the server
+
+Once the server is running, connecting any GitHub repository is three steps:
+
+**1. Configure the server (admin, once per org)**
+
+In the dashboard:
+- **Settings** → set *Rules repository* (`owner/repo`) and *Rules ref* (`main`).
+  If the repo is private, paste a GitHub PAT with `contents:read` scope — it is stored encrypted.
+- Set the *Policy JSON*, e.g. `{"fail_on_severity": ["error"], "block_merge": true}`
+- **Settings → API Keys** → create a key and copy it immediately (shown once).
+
+**2. Add the API key as a secret in the target repo**
+
+GitHub repo → **Settings → Secrets and variables → Actions → New repository secret**:
+
+```
+Name:  SCANNER_API_KEY
+Value: <key from step 1>
+```
+
+**3. Add a workflow file**
+
+Create `.github/workflows/scan.yml` in the target repo:
+
+```yaml
+name: Code Scan
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  scan:
+    uses: crstnmac/tree-sitter-ci-scanner/.github/workflows/reusable-scan.yml@main
+    with:
+      scan-path: '.'
+      server-url: 'https://scanner.example.com'   # your server URL
+    secrets:
+      scanner-api-key: ${{ secrets.SCANNER_API_KEY }}
+    permissions:
+      security-events: write
+      statuses: write
+```
+
+On every push and pull request the workflow will:
+1. Fetch your org's merged rules from the server (`GET /api/v1/rules`, ETag-cached)
+2. Run the scanner binary locally inside the CI runner
+3. POST the SARIF results to the server (`POST /api/v1/scan`)
+4. The server evaluates policy, stores findings, and posts a ✅/❌ GitHub commit status
+
+Findings appear in the **Findings** dashboard. Source code never leaves GitHub.
+
+> **Standalone mode (no server):** omit `server-url` and `scanner-api-key`.
+> The workflow falls back to cloning rules from this repository and uploading SARIF
+> to GitHub Code Scanning — useful before you have a server running.
+
 ### Build the server binary only
 
 ```bash
