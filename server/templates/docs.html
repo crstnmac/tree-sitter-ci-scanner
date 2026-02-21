@@ -443,7 +443,7 @@ jobs:
       scan-path: '.'
       server-url: 'https://scanner.example.com'   # &lt;-- your server URL
     secrets:
-      scanner-api-key: ${{ secrets.SCANNER_API_KEY }}
+      scanner-api-key: ${{ "{{" }} secrets.SCANNER_API_KEY {{ "}}" }}
     permissions:
       security-events: write
       statuses: write</code></pre>
