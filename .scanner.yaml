@@ -1,10 +1,45 @@
-# Scanner Configuration File
-# Define custom rules for code scanning
+# Scanner Configuration
+#
+# Rule packs are in rules/. Copy the rules you want into this file.
+# Run: scanner rules  — to list active rules
+# Run: scanner scan . --recursive  — to scan with this config
 
 rules:
-  # JavaScript rules
+  # ── JavaScript: Security ──────────────────────────────────────────────────
+  - id: js-no-eval
+    name: No eval()
+    severity: error
+    language: javascript
+    query: |
+      (call_expression
+        function: (identifier) @fn
+        (#eq? @fn "eval"))
+    message: "eval() executes arbitrary strings as code and is a critical security risk"
+
+  - id: js-no-inner-html
+    name: No innerHTML assignment
+    severity: error
+    language: javascript
+    query: |
+      (assignment_expression
+        left: (member_expression
+          property: (property_identifier) @prop
+          (#eq? @prop "innerHTML")))
+    message: "Direct innerHTML assignment enables XSS. Use textContent or a sanitizer"
+
+  - id: js-no-alert
+    name: No alert/confirm/prompt
+    severity: warning
+    language: javascript
+    query: |
+      (call_expression
+        function: (identifier) @fn
+        (#match? @fn "^(alert|confirm|prompt)$"))
+    message: "Browser dialogs block the thread and should not reach production"
+
+  # ── JavaScript: Conventions ───────────────────────────────────────────────
   - id: js-no-console-log
-    name: No console.log statements
+    name: No console.log
     severity: warning
     language: javascript
     query: |
@@ -13,53 +48,89 @@ rules:
           object: (identifier) @obj
           property: (property_identifier) @prop
           (#eq? @obj "console")
-          (#eq? @prop "log"))
-        arguments: (arguments) @args)
-    message: "Remove console.log statements before committing code"
+          (#eq? @prop "log")))
+    message: "Remove console.log before committing. Use a structured logger instead"
 
-  - id: js-no-eval
-    name: No eval() usage
+  - id: js-no-debugger
+    name: No debugger statement
     severity: error
     language: javascript
     query: |
-      (call_expression
-        function: (identifier) @func
-        (#eq? @func "eval"))
-    message: "Using eval() is dangerous and should be avoided"
+      (debugger_statement) @debugger
+    message: "debugger statement must not reach production"
 
-  # HTML rules (disabled - queries need fixing)
-  # - id: html-missing-alt
-  #   name: Missing alt attribute on images
-  #   severity: error
-  #   language: html
-  #   query: |
-  #     (element
-  #       (start_tag
-  #         tag_name: "img"
-  #         (attribute
-  #           attribute_name: "src")) @img
-  #       (#not-has-attr? @img "alt"))
-  #   message: "Image tag is missing alt attribute for accessibility"
-
-  # - id: html-unsafe-inline-script
-  #   name: Unsafe inline script
-  #   severity: warning
-  #   language: html
-  #   query: |
-  #     (element
-  #       (start_tag
-  #         tag_name: "script"
-  #         (attribute
-  #           attribute_name: "onload")))
-  #   message: "Avoid inline event handlers (use addEventListener instead)"
-
-  # TypeScript rules
+  # ── TypeScript: Safety ────────────────────────────────────────────────────
   - id: ts-no-any
-    name: Avoid 'any' type
+    name: No 'any' type annotation
     severity: warning
     language: typescript
     query: |
       (type_annotation
         (predefined_type) @type
         (#eq? @type "any"))
-    message: "Avoid using 'any' type - it defeats the purpose of TypeScript"
+    message: "Avoid 'any' — use 'unknown' and narrow the type, or define a proper interface"
+
+  - id: ts-no-as-any
+    name: No 'as any' type assertion
+    severity: error
+    language: typescript
+    query: |
+      (as_expression
+        type: (predefined_type) @type
+        (#eq? @type "any"))
+    message: "'as any' disables type checking entirely. Use a specific type assertion"
+
+  - id: ts-no-ts-ignore
+    name: No @ts-ignore
+    severity: warning
+    language: typescript
+    query: |
+      (comment) @comment
+      (#match? @comment "@ts-ignore")
+    message: "@ts-ignore suppresses errors silently. Fix the underlying issue or use @ts-expect-error"
+
+  # ── Python: Security ──────────────────────────────────────────────────────
+  - id: py-no-eval
+    name: No eval()
+    severity: error
+    language: python
+    query: |
+      (call
+        function: (identifier) @fn
+        (#eq? @fn "eval"))
+    message: "eval() executes arbitrary strings as code and is a critical security risk"
+
+  - id: py-no-shell-true
+    name: No subprocess with shell=True
+    severity: error
+    language: python
+    query: |
+      (call
+        arguments: (argument_list
+          (keyword_argument
+            name: (identifier) @kw
+            value: (true))
+          (#eq? @kw "shell")))
+    message: "shell=True with user-controlled input enables command injection"
+
+  # ── Python: Conventions ───────────────────────────────────────────────────
+  - id: py-no-print
+    name: No print() statements
+    severity: warning
+    language: python
+    query: |
+      (call
+        function: (identifier) @fn
+        (#eq? @fn "print"))
+    message: "Remove print() before committing. Use the logging module instead"
+
+  # ── HTML: Accessibility ───────────────────────────────────────────────────
+  - id: html-no-inline-event-handler
+    name: No inline event handlers
+    severity: warning
+    language: html
+    query: |
+      (attribute
+        (attribute_name) @attr
+        (#match? @attr "^on[a-z]+"))
+    message: "Inline event handlers enable XSS. Use addEventListener instead"

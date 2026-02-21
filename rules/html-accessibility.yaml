@@ -1,0 +1,43 @@
+rules:
+  - id: html-no-inline-event-handler
+    name: No inline event handlers
+    severity: warning
+    language: html
+    query: |
+      (attribute
+        (attribute_name) @attr
+        (#match? @attr "^on[a-z]+"))
+    message: "Inline event handlers (onclick, onload, etc.) mix behaviour with markup and enable XSS. Use addEventListener"
+
+  - id: html-no-inline-style
+    name: No inline styles
+    severity: note
+    language: html
+    query: |
+      (attribute
+        (attribute_name) @attr
+        (#eq? @attr "style"))
+    message: "Inline styles make theming and responsive design harder. Move styles to a CSS class"
+
+  - id: html-no-autofocus
+    name: No autofocus attribute
+    severity: note
+    language: html
+    query: |
+      (attribute
+        (attribute_name) @attr
+        (#eq? @attr "autofocus"))
+    message: "autofocus can disorient screen reader users. Confirm this is intentional"
+
+  - id: html-no-target-blank-unsafe
+    name: No target="_blank" without rel
+    severity: warning
+    language: html
+    query: |
+      (attribute
+        (attribute_name) @attr
+        (quoted_attribute_value
+          (attribute_value) @val)
+        (#eq? @attr "target")
+        (#eq? @val "_blank"))
+    message: "target=\"_blank\" without rel=\"noopener noreferrer\" leaks window.opener. Add the rel attribute"

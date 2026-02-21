@@ -1,0 +1,101 @@
+# Team Convention Rules — Template
+#
+# Copy this file into your project and customise the rules to match your
+# internal patterns. These rules enforce that developers use your team's
+# shared wrappers and utilities rather than calling third-party libraries
+# or browser APIs directly.
+#
+# Usage: scanner scan src/ --config .scanner.yaml
+
+rules:
+  # ── HTTP / API calls ──────────────────────────────────────────────────────
+  #
+  # Enforce using your internal HTTP wrapper instead of calling fetch() or
+  # axios directly. Replace "apiClient" with whatever your team uses.
+
+  - id: team-no-raw-fetch
+    name: Use internal HTTP client instead of fetch()
+    severity: error
+    language: javascript
+    query: |
+      (call_expression
+        function: (identifier) @fn
+        (#eq? @fn "fetch"))
+    message: "Use apiClient() from @company/http — not fetch() directly. It handles auth, retries, and error formatting"
+
+  - id: team-no-axios-import
+    name: Do not import axios directly
+    severity: error
+    language: javascript
+    query: |
+      (import_statement
+        source: (string
+          (string_fragment) @src
+          (#eq? @src "axios")))
+    message: "Import httpClient from @company/http instead of importing axios directly"
+
+  # ── Configuration / environment ───────────────────────────────────────────
+  #
+  # Prevent direct process.env access — all config should flow through a
+  # validated config module so missing keys fail at startup, not at runtime.
+
+  - id: team-no-process-env
+    name: Use config module instead of process.env
+    severity: warning
+    language: javascript
+    query: |
+      (member_expression
+        object: (member_expression
+          object: (identifier) @obj
+          property: (property_identifier) @prop
+          (#eq? @obj "process")
+          (#eq? @prop "env")))
+    message: "Access config via getConfig() from @company/config — not process.env directly. Values are validated at startup"
+
+  # ── Logging ───────────────────────────────────────────────────────────────
+  #
+  # Enforce the internal logger so all log output is structured JSON with
+  # consistent fields (trace-id, service name, level).
+
+  - id: team-no-console-log
+    name: Use internal logger instead of console.log
+    severity: error
+    language: javascript
+    query: |
+      (call_expression
+        function: (member_expression
+          object: (identifier) @obj
+          property: (property_identifier) @prop
+          (#eq? @obj "console")
+          (#eq? @prop "log")))
+    message: "Use logger from @company/logger — not console.log. Structured logs are required in production"
+
+  # ── Database ──────────────────────────────────────────────────────────────
+  #
+  # Catch raw SQL strings being passed around. Teams using an ORM or query
+  # builder should never need string-concatenated SQL.
+
+  - id: team-no-raw-sql
+    name: No raw SQL string literals
+    severity: warning
+    language: javascript
+    query: |
+      (call_expression
+        arguments: (arguments
+          (template_string) @sql
+          (#match? @sql "(?i)(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE)\\s")))
+    message: "Use the query builder or ORM instead of raw SQL strings — prevents injection and keeps queries auditable"
+
+  # ── Error handling ────────────────────────────────────────────────────────
+  #
+  # Prevent swallowed errors — every catch block should at minimum log
+  # before returning or re-throwing.
+
+  - id: team-no-empty-catch
+    name: No empty catch blocks
+    severity: error
+    language: javascript
+    query: |
+      (catch_clause
+        body: (statement_block .) @empty_body)
+    message: "Empty catch block silently swallows errors. At minimum, log the error before continuing"

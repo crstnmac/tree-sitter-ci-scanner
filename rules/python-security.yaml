@@ -1,0 +1,65 @@
+rules:
+  - id: py-no-eval
+    name: No eval()
+    severity: error
+    language: python
+    query: |
+      (call
+        function: (identifier) @fn
+        (#eq? @fn "eval"))
+    message: "eval() executes arbitrary strings as code and is a critical security risk"
+
+  - id: py-no-exec
+    name: No exec()
+    severity: error
+    language: python
+    query: |
+      (call
+        function: (identifier) @fn
+        (#eq? @fn "exec"))
+    message: "exec() executes arbitrary code and is a critical security risk"
+
+  - id: py-no-pickle-loads
+    name: No pickle.loads()
+    severity: error
+    language: python
+    query: |
+      (call
+        function: (attribute
+          object: (identifier) @obj
+          attribute: (identifier) @method)
+        (#eq? @obj "pickle")
+        (#eq? @method "loads"))
+    message: "pickle.loads() on untrusted data enables arbitrary code execution. Use a safe format like JSON"
+
+  - id: py-no-shell-true
+    name: No subprocess with shell=True
+    severity: error
+    language: python
+    query: |
+      (call
+        arguments: (argument_list
+          (keyword_argument
+            name: (identifier) @kw
+            value: (true))
+          (#eq? @kw "shell")))
+    message: "shell=True with user-controlled input enables command injection. Pass a list of arguments instead"
+
+  - id: py-no-assert-in-production
+    name: No assert statements outside tests
+    severity: warning
+    language: python
+    query: |
+      (assert_statement) @assert
+    message: "assert statements are stripped with -O. Use explicit conditionals for runtime validation"
+
+  - id: py-no-hardcoded-password
+    name: No hardcoded password variable
+    severity: error
+    language: python
+    query: |
+      (assignment
+        left: (identifier) @name
+        right: (string)
+        (#match? @name "(?i)(password|passwd|secret|api_key|token)"))
+    message: "Hardcoded credential detected. Use environment variables or a secrets manager"

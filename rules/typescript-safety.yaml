@@ -1,0 +1,46 @@
+rules:
+  - id: ts-no-any-annotation
+    name: No 'any' type annotation
+    severity: warning
+    language: typescript
+    query: |
+      (type_annotation
+        (predefined_type) @type
+        (#eq? @type "any"))
+    message: "Avoid 'any' — use 'unknown' and narrow the type, or define a proper interface"
+
+  - id: ts-no-as-any
+    name: No 'as any' type assertion
+    severity: error
+    language: typescript
+    query: |
+      (as_expression
+        type: (predefined_type) @type
+        (#eq? @type "any"))
+    message: "'as any' disables type checking entirely. Use a specific type assertion"
+
+  - id: ts-no-ts-ignore
+    name: No @ts-ignore
+    severity: warning
+    language: typescript
+    query: |
+      (comment) @comment
+      (#match? @comment "@ts-ignore")
+    message: "@ts-ignore suppresses errors silently. Fix the underlying type issue or use @ts-expect-error with a comment"
+
+  - id: ts-no-ts-nocheck
+    name: No @ts-nocheck
+    severity: error
+    language: typescript
+    query: |
+      (comment) @comment
+      (#match? @comment "@ts-nocheck")
+    message: "@ts-nocheck disables type checking for the entire file"
+
+  - id: ts-no-non-null-assertion
+    name: No non-null assertion operator
+    severity: warning
+    language: typescript
+    query: |
+      (non_null_expression) @expr
+    message: "Non-null assertion (!) hides potential null/undefined errors. Add an explicit null check instead"

@@ -1,0 +1,51 @@
+rules:
+  - id: js-no-console-log
+    name: No console.log
+    severity: warning
+    language: javascript
+    query: |
+      (call_expression
+        function: (member_expression
+          object: (identifier) @obj
+          property: (property_identifier) @prop
+          (#eq? @obj "console")
+          (#eq? @prop "log")))
+    message: "Remove console.log before committing. Use a structured logger instead"
+
+  - id: js-no-console-any
+    name: No console.*
+    severity: note
+    language: javascript
+    query: |
+      (call_expression
+        function: (member_expression
+          object: (identifier) @obj
+          (#eq? @obj "console")))
+    message: "Avoid console.* in production code. Use a structured logger"
+
+  - id: js-no-debugger
+    name: No debugger statement
+    severity: error
+    language: javascript
+    query: |
+      (debugger_statement) @debugger
+    message: "debugger statement must not reach production"
+
+  - id: js-no-todo-comment
+    name: No unresolved TODO/FIXME
+    severity: note
+    language: javascript
+    query: |
+      (comment) @comment
+      (#match? @comment "(TODO|FIXME|HACK|XXX)")
+    message: "Unresolved TODO/FIXME comment — create a ticket and remove the comment"
+
+  - id: js-no-magic-number
+    name: No magic numbers
+    severity: note
+    language: javascript
+    query: |
+      (variable_declarator
+        value: (number) @num
+        (#not-match? @num "^(0|1|-1)$"))
+    message: "Extract magic numbers into named constants for readability"

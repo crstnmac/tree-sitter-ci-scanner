@@ -1,0 +1,36 @@
+rules:
+  - id: py-no-print
+    name: No print() statements
+    severity: warning
+    language: python
+    query: |
+      (call
+        function: (identifier) @fn
+        (#eq? @fn "print"))
+    message: "Remove print() before committing. Use the logging module instead"
+
+  - id: py-no-bare-except
+    name: No bare except clause
+    severity: warning
+    language: python
+    query: |
+      (except_clause
+        !type) @bare_except
+    message: "Bare except catches SystemExit and KeyboardInterrupt. Catch specific exception types"
+
+  - id: py-no-todo-comment
+    name: No unresolved TODO/FIXME
+    severity: note
+    language: python
+    query: |
+      (comment) @comment
+      (#match? @comment "(TODO|FIXME|HACK|XXX)")
+    message: "Unresolved TODO/FIXME comment — create a ticket and remove the comment"
+
+  - id: py-no-global-statement
+    name: No global statement
+    severity: warning
+    language: python
+    query: |
+      (global_statement) @global
+    message: "global mutates module-level state and makes code hard to reason about"

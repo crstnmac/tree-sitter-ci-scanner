@@ -1,0 +1,77 @@
+rules:
+  - id: js-no-eval
+    name: No eval()
+    severity: error
+    language: javascript
+    query: |
+      (call_expression
+        function: (identifier) @fn
+        (#eq? @fn "eval"))
+    message: "eval() executes arbitrary strings as code and is a critical security risk"
+
+  - id: js-no-document-write
+    name: No document.write()
+    severity: error
+    language: javascript
+    query: |
+      (call_expression
+        function: (member_expression
+          object: (identifier) @obj
+          property: (property_identifier) @prop
+          (#eq? @obj "document")
+          (#eq? @prop "write")))
+    message: "document.write() can overwrite the page and enables XSS attacks"
+
+  - id: js-no-inner-html
+    name: No innerHTML assignment
+    severity: error
+    language: javascript
+    query: |
+      (assignment_expression
+        left: (member_expression
+          property: (property_identifier) @prop
+          (#eq? @prop "innerHTML")))
+    message: "Direct innerHTML assignment enables XSS. Use textContent or a sanitizer"
+
+  - id: js-no-outer-html
+    name: No outerHTML assignment
+    severity: error
+    language: javascript
+    query: |
+      (assignment_expression
+        left: (member_expression
+          property: (property_identifier) @prop
+          (#eq? @prop "outerHTML")))
+    message: "Direct outerHTML assignment enables XSS. Use textContent or a sanitizer"
+
+  - id: js-no-settimeout-string
+    name: No setTimeout with string argument
+    severity: error
+    language: javascript
+    query: |
+      (call_expression
+        function: (identifier) @fn
+        (#match? @fn "^(setTimeout|setInterval)$")
+        arguments: (arguments
+          (string) .))
+    message: "Passing a string to setTimeout/setInterval is equivalent to eval()"
+
+  - id: js-no-alert
+    name: No alert/confirm/prompt
+    severity: warning
+    language: javascript
+    query: |
+      (call_expression
+        function: (identifier) @fn
+        (#match? @fn "^(alert|confirm|prompt)$"))
+    message: "Browser dialogs block the thread and should not reach production"
+
+  - id: js-no-dangerously-set-inner-html
+    name: No dangerouslySetInnerHTML
+    severity: error
+    language: javascript
+    query: |
+      (jsx_attribute
+        (jsx_attribute_name) @attr
+        (#eq? @attr "dangerouslySetInnerHTML"))
+    message: "dangerouslySetInnerHTML bypasses React's XSS protection. Use a sanitizer if HTML rendering is required"
