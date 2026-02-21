@@ -253,7 +253,7 @@ docker run -d --name scanner-db \
   -e POSTGRES_USER=scanner \
   -e POSTGRES_PASSWORD=scanner \
   -p 5432:5432 \
-  postgres:16-alpine
+  postgres:18-alpine
 
 # Source secrets
 export DATABASE_URL=postgres://scanner:scanner@localhost:5432/scanner
