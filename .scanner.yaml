@@ -1,0 +1,65 @@
+# Scanner Configuration File
+# Define custom rules for code scanning
+
+rules:
+  # JavaScript rules
+  - id: js-no-console-log
+    name: No console.log statements
+    severity: warning
+    language: javascript
+    query: |
+      (call_expression
+        function: (member_expression
+          object: (identifier) @obj
+          property: (property_identifier) @prop
+          (#eq? @obj "console")
+          (#eq? @prop "log"))
+        arguments: (arguments) @args)
+    message: "Remove console.log statements before committing code"
+
+  - id: js-no-eval
+    name: No eval() usage
+    severity: error
+    language: javascript
+    query: |
+      (call_expression
+        function: (identifier) @func
+        (#eq? @func "eval"))
+    message: "Using eval() is dangerous and should be avoided"
+
+  # HTML rules (disabled - queries need fixing)
+  # - id: html-missing-alt
+  #   name: Missing alt attribute on images
+  #   severity: error
+  #   language: html
+  #   query: |
+  #     (element
+  #       (start_tag
+  #         tag_name: "img"
+  #         (attribute
+  #           attribute_name: "src")) @img
+  #       (#not-has-attr? @img "alt"))
+  #   message: "Image tag is missing alt attribute for accessibility"
+
+  # - id: html-unsafe-inline-script
+  #   name: Unsafe inline script
+  #   severity: warning
+  #   language: html
+  #   query: |
+  #     (element
+  #       (start_tag
+  #         tag_name: "script"
+  #         (attribute
+  #           attribute_name: "onload")))
+  #   message: "Avoid inline event handlers (use addEventListener instead)"
+
+  # TypeScript rules
+  - id: ts-no-any
+    name: Avoid 'any' type
+    severity: warning
+    language: typescript
+    query: |
+      (type_annotation
+        (predefined_type) @type
+        (#eq? @type "any"))
+    message: "Avoid using 'any' type - it defeats the purpose of TypeScript"

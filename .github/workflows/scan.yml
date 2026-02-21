@@ -1,0 +1,45 @@
+name: Code Scan
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  scan:
+    name: Scan code
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install scanner
+        run: |
+          curl -sSL https://github.com/yourusername/tree-sitter-ci-scanner/releases/latest/download/scanner-x86_64-unknown-linux-gnu -o /usr/local/bin/scanner
+          chmod +x /usr/local/bin/scanner
+
+      - name: Run scanner
+        run: scanner scan src/ --recursive --output results.sarif
+        continue-on-error: true
+
+      - name: Upload SARIF results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
+          category: scanner
+          codeql_path: /tmp/codeql  # Required even though we're not using CodeQL
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "Scanner ran on the repository." >> $GITHUB_STEP_SUMMARY
+          if [ -f results.sarif ]; then
+            ISSUES=$(jq '.runs[0].results | length' results.sarif 2>/dev/null || echo "0")
+            echo "Found $ISSUES issues." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Scan failed to run or produced no results." >> $GITHUB_STEP_SUMMARY
+          fi

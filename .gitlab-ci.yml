@@ -1,0 +1,36 @@
+stages:
+  - scan
+
+code_scan:
+  stage: scan
+  image: rust:latest
+
+  before_script:
+    # Install scanner from releases
+    - cargo install scanner --git https://github.com/yourusername/tree-sitter-ci-scanner.git
+    # OR build from source
+    # - git clone https://github.com/yourusername/tree-sitter-ci-scanner.git
+    # - cd tree-sitter-ci-scanner
+    # - cargo build --release
+    # - mv target/release/scanner /usr/local/bin/
+  script:
+    - scanner scan src/ --recursive --output results.sarif
+  artifacts:
+    when: always
+    paths:
+      - results.sarif
+    reports:
+      sast: results.sarif
+  allow_failure: true
+
+# You can also include this as part of your existing pipeline
+existing_job:
+  stage: test
+  script:
+    - your existing tests
+  after_script:
+    - scanner scan . --recursive --output scan-results.sarif
+  artifacts:
+    when: always
+    paths:
+      - scan-results.sarif
