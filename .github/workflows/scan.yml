@@ -42,11 +42,28 @@ jobs:
       - name: Summary
         if: always()
         run: |
-          echo "## Scan Results" >> $GITHUB_STEP_SUMMARY
-          echo "Scanner ran on the repository." >> $GITHUB_STEP_SUMMARY
-          if [ -f results.sarif ]; then
-            ISSUES=$(jq '.runs[0].results | length' results.sarif 2>/dev/null || echo "0")
-            echo "Found $ISSUES issues." >> $GITHUB_STEP_SUMMARY
-          else
-            echo "Scan failed to run or produced no results." >> $GITHUB_STEP_SUMMARY
-          fi
+          {
+            echo "## Scan Results"
+            if [ ! -f results.sarif ]; then
+              echo ":x: Scanner failed to run or produced no output."
+            else
+              ISSUES=$(jq '.runs[0].results | length' results.sarif 2>/dev/null || echo "0")
+              if [ "$ISSUES" -eq 0 ]; then
+                echo ":white_check_mark: No issues found."
+              else
+                echo ":warning: **$ISSUES issue(s) found.**"
+                echo ""
+                echo "| Severity | Rule | File | Line |"
+                echo "| --- | --- | --- | --- |"
+                jq -r '
+                  .runs[0].results[] |
+                  [
+                    .level // "note",
+                    .ruleId,
+                    (.locations[0].physicalLocation.artifactLocation.uri // "-"),
+                    (.locations[0].physicalLocation.region.startLine | tostring)
+                  ] | "| " + join(" | ") + " |"
+                ' results.sarif
+              fi
+            fi
+          } >> $GITHUB_STEP_SUMMARY
